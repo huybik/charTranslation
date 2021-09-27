@@ -14,10 +14,9 @@ Most implementations on the net of transformer text translation use word or byte
 
 Sample translation results
 ```
-thời tiết hôm nay thật đẹp! | <sos>what is the weather for the mountain!<eos>
-xin chào  | <sos>please come.<eos>
-bạn đã ăn sáng chưa? | <sos>have you eaten the morning?<eos>
-
+thời tiết hôm nay thật đẹp! | <sos>the weather is concerned! it's beautiful!<eos>
+xin chào | <sos>please come along<eos>
+bạn đã ăn sáng chưa? | <sos>have you eaten the morning, didn't you?<eos>
 ```
 This implementation inspired by <a href='https://github.com/karpathy/minGPT'>Andrej Karpathy MinGPT</a>
 
