@@ -8,6 +8,6 @@
 
 Most implementations on the net of transformer text translation use word or byte-pair with 10000+ vocabularies as input which takes ages to train. This implementation use only characters in text data as vocabulary (<300 chars) and nothing more, so aside from pytorch no installation of any kind required. I also include a compact beam search implementation at the end.
 
-This implementation inspired by Andrej Karpathy MinGPT
+This implementation inspired by <a href='https://github.com/karpathy/minGPT'>Andrej Karpathy MinGPT</a>
 
 
