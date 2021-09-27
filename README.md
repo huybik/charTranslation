@@ -11,6 +11,13 @@ Most implementations on the net of transformer text translation use word or byte
 - A compact fast and greedy beam search implementation at the end of model
 - Boilerplate for training
 
+Sample result
+```
+thời tiết hôm nay thật đẹp! | <sos>what is the weather for the mountain!<eos>
+xin chào  | <sos>please come.<eos>
+bạn đã ăn sáng chưa? | <sos>have you eaten the morning?<eos>
+
+```
 This implementation inspired by <a href='https://github.com/karpathy/minGPT'>Andrej Karpathy MinGPT</a>
 
 
