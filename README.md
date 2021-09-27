@@ -1,4 +1,4 @@
-# char-transformer-machine-translation
+# Character-level machine translation Transformer sequence to sequence in Pytorch
 **Translate text with Transformer sequence to sequence architecture using only characters, implement in Pytorch**
 
 <p align = "center"> 
