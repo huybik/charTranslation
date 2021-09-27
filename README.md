@@ -18,6 +18,6 @@ thời tiết hôm nay thật đẹp! | <sos>the weather is concerned! it's beau
 xin chào | <sos>please come along<eos>
 bạn đã ăn sáng chưa? | <sos>have you eaten the morning, didn't you?<eos>
 ```
-This implementation inspired by <a href='https://github.com/karpathy/minGPT'>Andrej Karpathy MinGPT</a>
+This implementation is inspired by <a href='https://github.com/karpathy/minGPT'>Andrej Karpathy MinGPT</a>
 
 
