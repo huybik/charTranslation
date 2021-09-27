@@ -12,7 +12,7 @@ Most implementations on the net of transformer text translation use word or byte
 - Boilerplate for training ```trainer.py```
 - Jupyter notebook to run model step by step
 
-Sample result
+Sample translation results
 ```
 thời tiết hôm nay thật đẹp! | <sos>what is the weather for the mountain!<eos>
 xin chào  | <sos>please come.<eos>
