@@ -239,14 +239,14 @@ class Transformer(nn.Module):
 
                 # calcuate new score by dividing seq len
                 all_candidates = list()
-                for i, (seq, score) in enumerate(beam.out):
+                for i, (seq, score) in enumerate(beam.output):
                     new_score = score/len(seq)
                     all_candidates.append([seq, new_score])
 
                 ordered = sorted(all_candidates, key = lambda tup: tup[1])
 
                 for sequence,score in ordered[:1]:
-                    out += sample + '   ' + ''.join([dataset.i2ch[idx] for idx in list(sequence) if idx != 0]) + '\n'
+                    out += sample + ' | ' + ''.join([dataset.i2ch[idx] for idx in list(sequence) if idx != 0]) + '\n'
 
         self.train()
 
