@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import logging
 logger = logging.getLogger(__name__)
-
+from tqdm import tqdm
 class TransformerConfig:
     vocab_size = 1000
     sequence_len = 128
@@ -40,7 +40,7 @@ class SelfAttention(nn.Module):
         self.resid_drop = nn.Dropout(config.resid_pdrop)
         # concatenate n_head into one output and project
         self.proj = nn.Linear(embed_dim, embed_dim)
-        self.register_buffer("causal_mask", torch.tril(torch.ones(config.sequence_len, config.sequence_len))
+        self.register_buffer("causal_mask", torch.tril(torch.ones(config.sequence_len, config.sequence_len)).bool()
                                      .view(1, 1, config.sequence_len, config.sequence_len))
         self.n_head = config.n_head
         self.causal = config.causal
@@ -62,10 +62,13 @@ class SelfAttention(nn.Module):
         # scale q and k
         
         att = (q @ k.transpose(-2,-1))/(dk**0.5) # B,nh,T,dk x B,nh,dk,T -> B,nh,T,T
-        if pad_mask is not None:
-            att = att.masked_fill(pad_mask==0, float('-1e10'))
-        if causal is not None:
-            att = att.masked_fill(self.causal_mask == 0, float('-1e10'))
+        if pad_mask is not None and causal is not None:
+            full_mask = pad_mask & self.causal_mask # b,1,1,T & 1,1,T,T -> b,1,T,T
+            att = att.masked_fill(full_mask == 0, -1e9)
+        elif pad_mask is not None:
+            att = att.masked_fill(pad_mask == 0, -1e9)
+        elif causal is not None:
+            att = att.masked_fill(self.causal_mask == 0, -1e9)
         att = F.softmax(att, dim=-1)
         att = self.attn_drop(att)
         y = att @ v # B,nh,T,T x B,Nh,T,dk -> B,nh,T,dk
@@ -126,7 +129,7 @@ class DecoderBlock(nn.Module):
         
     def forward(self, x, enc_x, pad_mask=None, causal=True):
         x_norm = self.layernorm1(x)
-        x = x + self.attention1(x_norm, x_norm, x_norm, pad_mask=pad_mask, causal=causal)
+        x = x + self.attention1(x_norm, x_norm, x_norm, pad_mask, causal)
         x_norm = self.layernorm2(x)
         x_enc_norm = self.layernorm3(enc_x)
         x = x + self.attention2(x_norm, x_enc_norm, x_enc_norm)
@@ -139,8 +142,8 @@ class Transformer(nn.Module):
         super().__init__()
 
         self.embed = nn.Embedding(config.vocab_size, config.embed_dim, padding_idx=0)
+        self.position_embedding = nn.Embedding(config.sequence_len, config.embed_dim)
         self.drop = nn.Dropout(config.embed_pdrop)
-        self.position_embedding = nn.Parameter(torch.zeros(1, config.sequence_len, config.embed_dim))
 
         self.encode_blocks = nn.ModuleList([EncoderBlock(config) for i in range(config.n_block)])
         self.decode_blocks = nn.ModuleList([DecoderBlock(config) for i in range(config.n_block)])
@@ -171,85 +174,80 @@ class Transformer(nn.Module):
     def forward(self, idx, target=None):
         x = self.encode(idx)
         logits = self.decode(target[:,:-1], x)
-        loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), target[:,1:].reshape(-1))
+        loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), target[:,1:].reshape(-1), ignore_index=0)
         return logits, loss
 
     def encode(self, idx):
         batch_size, sequence_len = idx.shape
-        embed_dim = self.embed_dim
-        pad_mask_x = (idx>0).view(batch_size, 1, 1, sequence_len) # 0 is padding idx
-        position_embedding = self.position_embedding[:,:sequence_len,:]
-        embed_x = self.embed(idx) # each token map to learnable vector
-        x = self.drop(embed_x + self.position_embedding)
+        pad_mask = (idx!=0).unsqueeze(1).unsqueeze(2) # 0 is padding idx, b,1,1,T
+        pos = torch.arange(0, sequence_len).unsqueeze(0).repeat(batch_size, 1).to(self.device)
+        position_embedding = self.position_embedding(pos)
+       
+        embed = self.embed(idx) # each token map to learnable vector
+        x = self.drop(embed + position_embedding)
+
         for block in self.encode_blocks:
-            x = block(x, pad_mask_x)
+            x = block(x, pad_mask)
 
         return x
 
-    def decode(self, y, x_encode):
-        batch_size, sequence_len = y.shape
-        pad_mask_y = (y>0).view(batch_size, 1, 1, sequence_len) # 0 is padding idx
-        position_embedding = self.position_embedding[:,:sequence_len,:]
-        embed_y = self.embed(y)
-        y = self.drop(embed_y + position_embedding)
+    def decode(self, idx, x_encode):
+        batch_size, sequence_len = idx.shape
+        pad_mask = (idx!=0).unsqueeze(1).unsqueeze(2) # 0 is padding idx, b,1,1,T
+        pos = torch.arange(0, sequence_len).unsqueeze(0).repeat(batch_size, 1).to(self.device)
+        position_embedding = self.position_embedding(pos)
+
+        embed = self.embed(idx)
+        y = self.drop(embed + position_embedding)
 
         for block in self.decode_blocks:
-            y = block(y, x_encode, pad_mask_y)
+            y = block(y, x_encode, pad_mask)
         y = self.layernorm(y)
-
         logits = self.linear(y)
         
 
         return logits
 
 
-    def generate_output(self, sample, dataset, temperature=1, top_k=None, steps = 1000):
+    def generate_output(self, samples, dataset, temperature=1, top_k=None, steps = 1000, print_process=None):
         '''
         Generate target translations given samples. Here beam search is added to find top-k
         sequence with lowest score.
         '''
         import numpy as np
-
-        if sample is None:
-            sentences = ["mất bao lâu để bay từ tokyo đến los angeles?",
-                        'đó là một cái túi mà tôi bị mất trong phòng ngày hôm qua.',
-                        "mary đang mặc một chiếc cà vạt",
-                        'tôi muốn một cuốn sách']
+        assert samples is not None, "Test samples not given!"
             
-        else: sentences = sample
-
         self.eval()
         with torch.no_grad():
-            
-            device = self.device
-            vocab_size = dataset.vocab_size
-            sequence_len = dataset.sequence_len
-            out = ''
-            for sample in sentences:
-                indx = dataset.padding([dataset.ch2i[ch] for ch in sample] + [dataset.ch2i['<eos>']])
+            out = list()
+            if print_process is not None:
+                samples = tqdm(samples)
+            for sample in samples:
+                if dataset.encoder is None:
+                    indx = dataset.padding([dataset.ch2i[ch] for ch in sample] + [dataset.ch2i['<eos>']])
+                else:
+                    indx = dataset.padding(dataset.encoder.encode(sample).ids + [dataset.ch2i['<eos>']])
                 indx = torch.tensor(indx, dtype=torch.long).unsqueeze(0).to(self.device)
                 x = self.encode(indx)
                 beam = BeamSearch(self, x, top_k, dataset.ch2i['<sos>'], dataset.ch2i['<eos>'])
                 
-                for i in range(0,sequence_len):
+                for i in range(0,dataset.sequence_len):
 
                     status = beam.advance()
                     if status is None: # cant advance anymore
                         break
-
                 # calcuate new score by dividing seq len
-                all_candidates = list()
-                for i, (seq, score) in enumerate(beam.output):
-                    new_score = score/len(seq)
-                    all_candidates.append([seq, new_score])
-
-                ordered = sorted(all_candidates, key = lambda tup: tup[1])
-
-                for sequence,score in ordered[:1]:
-                    out += sample + ' | ' + ''.join([dataset.i2ch[idx] for idx in list(sequence) if idx != 0]) + '\n'
+                all_candidates = [(seq, score/len(seq)) for seq, score in beam.output]
+                sequences = sorted(all_candidates, key = lambda tup: tup[1])[:1]
+                for seq, score in sequences:
+                    if dataset.encoder is None:
+                        out.append(''.join([dataset.i2ch[idx] for idx in seq if (idx not in 
+                        [dataset.ch2i['<sos>'],dataset.ch2i['<eos>'],dataset.ch2i['<pad>']])]))
+                    else:
+                        out.append(''.join(dataset.encoder.decode(seq, skip_special_tokens=True)))
 
         self.train()
-
+        
         return out
 
 class BeamSearch:
@@ -280,8 +278,10 @@ class BeamSearch:
 
         # stack sequences and paste to zeros tensor, ready as input to network
         temp = torch.stack([torch.tensor(seq) for seq,score in self.sequences], dim=0) # get the sequences
+
         padded = torch.zeros((num_seq, self.sequence_len), dtype=torch.long, device=self.model.device)
         padded[:, :self.current_location+1] = temp # [k,l]
+
         y = self.model.decode(padded, x)[:,self.current_location,:] # [k,h]
 
         # add n output of netowrk to current sequences, and re-rank them

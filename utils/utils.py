@@ -24,3 +24,13 @@ def pickle(file_path, data=None):
             data = pickle.load(f)
 
     return data
+
+def bleu_score(references, candidates):
+    from nltk.translate.bleu_score import corpus_bleu
+
+    # reference and candidate is list of strings
+    references = [[sen.split(' ')] for sen in references]
+    candidates = [sen.split(' ') for sen in candidates]
+    score = corpus_bleu(references, candidates)*100
+    return score, references, candidates
+

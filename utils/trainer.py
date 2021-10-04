@@ -48,6 +48,7 @@ class Trainer:
         # take over whatever gpus are on the system
         self.device = config.device
         self.min_loss = 1e10
+        self.loss_smooth = 1e3
 
         if self.device=='cuda':
 #             self.device = torch.cuda.current_device()
@@ -74,7 +75,7 @@ class Trainer:
                 num_workers=config.num_workers)
 
             final_token = len(loader)*config.batch_size
-            loss_smooth = 0
+            
             
             pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
             for it, (x,y) in pbar:
@@ -106,9 +107,9 @@ class Trainer:
                             param_group['lr'] = lr
                     else:
                         lr = config.learning_rate
-                    loss_smooth = 0.9*loss_smooth + 0.1*loss.item()
+                    self.loss_smooth = 0.9*self.loss_smooth + 0.1*loss.item()
 #                     accuracy = 0.9*accuracy + 0.1*torch.sum(torch.argmax(b,axis=-1)==Y_batch)/len(A)
-                    pbar.set_description(f"epoch: {epoch+1} | train loss: {loss_smooth:.5f}  | lr: {lr:e}") # | Accuracy:{accuracy:.5f}
+                    pbar.set_description(f"epoch: {epoch+1} | train loss: {self.loss_smooth:.5f}  | lr: {lr:e}") # | Accuracy:{accuracy:.5f}
                 
                 if not is_train:
                     test_loss = float(np.mean(losses))
@@ -117,10 +118,10 @@ class Trainer:
 
                 if config.ckpt_n_print_iter is not None:
                     if it % config.ckpt_n_print_iter == 0:
-                        print(model.generate_output(None, data, top_k=3, temperature=0.5))
+                        print(model.generate_output(self.test_dataset, data, top_k=3, temperature=0.5))
                         if config.ckpt_path is not None:
-                            if loss.item() < self.min_loss:
-                                self.min_loss = loss.item()
+                            if self.loss_smooth < self.min_loss:
+                                self.min_loss = self.loss_smooth
                                 pickle(config.ckpt_path, model.state_dict()) # save
 
 
