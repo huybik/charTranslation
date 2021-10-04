@@ -50,7 +50,7 @@ class Trainer:
         self.min_loss = 1e10
         self.loss_smooth = 1e3
 
-        if self.device=='cuda':
+        if self.device is not 'cpu':
 #             self.device = torch.cuda.current_device()
             self.model.to(self.device)
 #             self.model = torch.nn.DataParallel(self.model).to(self.device)

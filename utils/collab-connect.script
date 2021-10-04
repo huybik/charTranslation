@@ -1,0 +1,6 @@
+function ClickConnect()
+{
+console.log("Working");
+document.querySelector("colab-connect-button").shadowRoot.getElementById("connect").click();
+}
+setInterval(ClickConnect,60000)
