@@ -81,7 +81,7 @@ class SelfAttention(nn.Module):
 
 class EncoderBlock(nn.Module):
     '''
-    self attention follow by feed forward, add skip connection (+) in between
+    combining layer norm, self attention, feed forward and skip connection (+) in between
     '''
     def __init__(self, config):
         super().__init__()
@@ -97,9 +97,11 @@ class EncoderBlock(nn.Module):
                             )
         
     def forward(self, x, pad_mask=None):
-        x_norm = self.layernorm1(x)
+        x_norm = self.layernorm1(x) # layer norm
+        # self attention + skip connection
         x = x + self.attention(x_norm, x_norm, x_norm, pad_mask)
         x_norm = self.layernorm2(x)
+        # feed forward + skip connection
         x = x + self.feedforward(x_norm)
         
         return x

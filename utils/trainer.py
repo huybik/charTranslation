@@ -80,16 +80,19 @@ class Trainer:
             pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
             for it, (x,y) in pbar:
                 x,y = x.to(self.device), y.to(self.device)
+                
+                # return loss
                 with torch.set_grad_enabled(is_train):
                     logits, loss = model(x,y)
                     loss = loss.mean()
                     losses.append(loss.item())
-                    
+                
+                # if is_train is True, do back prop and update weight
                 if is_train:
                     model.zero_grad()
-                    loss.backward()
+                    loss.backward() # back prop from loss
                     torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
-                    optimizer.step()
+                    optimizer.step() # update weight
                     
                     if config.lr_decay:
 
@@ -122,7 +125,7 @@ class Trainer:
                         if config.ckpt_path is not None:
                             if self.loss_smooth < self.min_loss:
                                 self.min_loss = self.loss_smooth
-                                pickle(config.ckpt_path, model.state_dict()) # save
+                                pickle(config.ckpt_path, model.state_dict()) # save model
 
 
                         
