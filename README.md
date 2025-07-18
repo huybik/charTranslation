@@ -1,5 +1,5 @@
 # Character-level machine translation Transformer sequence to sequence in Pytorch
-**Translate text with Transformer sequence to sequence architecture using only characters, implement in Pytorch**
+**Translate text with Transformer sequence to sequence architecture using only characters, from scratch in Pytorch**
 
 <p align = "center"> 
 <img src='https://github.com/huybik/charTranslation/blob/8a367afd51743efa856368cd43482a966c466d86/images/floating-man.jpg' width=400>
