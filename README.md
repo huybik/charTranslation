@@ -2,7 +2,7 @@
 **Translate text with Transformer sequence to sequence architecture using only characters, implement in Pytorch**
 
 <p align = "center"> 
-<img src='https://www.quotemaster.org/images/04/046e60f1f0f4f86cb84ac4eae813f55c.jpeg' width=400>
+<img src='https://github.com/huybik/charTranslation/blob/8a367afd51743efa856368cd43482a966c466d86/images/floating-man.jpg' width=400>
 </p>
 <p align = "center"> Light weight text translation </p>
 
